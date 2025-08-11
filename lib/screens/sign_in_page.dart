@@ -44,62 +44,90 @@ class _SignInPageState extends State<SignInPage> {
             ],
           ),
     );
-  }
+  }Future<void> _signIn() async {
+  setState(() => _isLoading = true);
 
-  Future<void> _signIn() async {
-    setState(() => _isLoading = true);
+  final email = _emailController.text.trim();
+  final password = _passwordController.text.trim();
 
-    final email = _emailController.text.trim();
-    final password = _passwordController.text.trim();
+  try {
+    // Sign in using AuthService
+    await context.read<AuthService>().signIn(
+      email: email,
+      password: password,
+      role: '',
+    );
 
-    try {
-      await context.read<AuthService>().signIn(
-        email: email,
-        password: password,
-        role: '',
-      );
+    if (!mounted) return;
 
-      if (!mounted) return;
+    final uid = FirebaseAuth.instance.currentUser!.uid;
+    final usersRef = FirebaseFirestore.instance.collection('users');
 
-      final doc =
-          await FirebaseFirestore.instance.collection('users').doc(email).get();
+    // Try UID-based document first
+    DocumentSnapshot<Map<String, dynamic>> doc =
+        await usersRef.doc(uid).get();
 
-      if (!mounted) return;
-
-      if (!doc.exists || doc.data()?['status'] != 'approved') {
-        await FirebaseAuth.instance.signOut();
-        if (!mounted) return;
-
-        await showDialog(
-          context: context,
-          builder:
-              (_) => AlertDialog(
-                title: const Text('Access Denied'),
-                content: const Text(
-                  'Your account is not yet approved by the admin.',
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () {
-                      if (Navigator.canPop(context))
-                        Navigator.of(context).pop();
-                    },
-                    child: const Text('OK'),
-                  ),
-                ],
-              ),
-        );
-      }
-    } on FirebaseAuthException {
-      if (!mounted) return;
-      await _showErrorDialog();
-    } catch (_) {
-      if (!mounted) return;
-      await _showErrorDialog();
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+    // Fallback to email-based document for old data
+    if (!doc.exists) {
+      doc = await usersRef.doc(email).get();
     }
+
+    if (!doc.exists) {
+      // No user record found
+      await FirebaseAuth.instance.signOut();
+      if (!mounted) return;
+      await _showAccessDeniedDialog();
+      return;
+    }
+
+    final data = doc.data()!;
+    final role = data['role'] ?? '';
+    final team = data['team'] ?? '';
+    final status = data['status'] ?? 'approved'; // Default to approved if null
+
+    // Block only if not admin and status explicitly not approved
+    if (role != 'admin' && status != 'approved') {
+      await FirebaseAuth.instance.signOut();
+      if (!mounted) return;
+      await _showAccessDeniedDialog();
+      return;
+    }
+
+    // ✅ Passed checks — proceed
+    print('Role: $role, Team: $team');
+
+  } on FirebaseAuthException {
+    if (!mounted) return;
+    await _showErrorDialog();
+  } catch (_) {
+    if (!mounted) return;
+    await _showErrorDialog();
+  } finally {
+    if (mounted) setState(() => _isLoading = false);
   }
+}
+
+Future<void> _showAccessDeniedDialog() async {
+  await showDialog(
+    context: context,
+    builder: (_) => AlertDialog(
+      title: const Text('Access Denied'),
+      content: const Text(
+        'Your account is not yet approved by the admin.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () {
+            if (Navigator.canPop(context)) {
+              Navigator.of(context).pop();
+            }
+          },
+          child: const Text('OK'),
+        ),
+      ],
+    ),
+  );
+}
 
   @override
   Widget build(BuildContext context) {

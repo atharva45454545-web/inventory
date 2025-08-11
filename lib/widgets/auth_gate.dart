@@ -12,24 +12,31 @@ class AuthGate extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final user = context.watch<User?>();
+    print(user);
     if (user == null) {
       return const SignInPage();
+      
+    }return FutureBuilder<String?>(
+  future: RoleService().getRole(user.uid),
+  builder: (context, snapshot) {
+    if (snapshot.connectionState == ConnectionState.waiting) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
     }
-    return FutureBuilder<String>(
-      future: RoleService().getRole(user.uid),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
-        }
-        final role = snapshot.data;
-        if (role == 'admin') {
-          return const AdminHome();
-        } else {
-          return const UserHome();
-        }
-      },
-    );
+    if (snapshot.hasError) {
+      return const Scaffold(
+        body: Center(child: Text('Error loading role')),
+      );
+    }
+    final role = snapshot.data ?? '';
+    if (role == 'admin') {
+      return const AdminHome();
+    }  else {
+      return const UserHome();
+    }
+  },
+);
+
   }
 }

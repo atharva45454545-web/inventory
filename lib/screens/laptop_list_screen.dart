@@ -12,6 +12,7 @@ class LaptopListScreen extends StatelessWidget {
   static const List<String> adminEmails = [
     'admin1@example.com',
     'admin2@example.com',
+    'dhruv.joshi@theinnovationstory.com'
   ];
   bool get isAdmin => adminEmails.contains(user.email);
 

@@ -14,7 +14,14 @@ class _SignUpPageState extends State<SignUpPage> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmController = TextEditingController();
+  final _nameController= TextEditingController();
+  final String name="";
   final String _role = 'user';
+  List<String> _teams = ['Team Alpha', 'Team Beta', 'Team Gamma'];
+List<String> _branches = ['Dadar','Bandra'];
+
+String _selectedTeam = 'Team Alpha';
+String _selectedBranch = 'Dadar';
 
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
@@ -66,46 +73,55 @@ class _SignUpPageState extends State<SignUpPage> {
           ),
     );
   }
-
-  Future<void> _signUp() async {
-    final email = _emailController.text.trim();
-    final password = _passwordController.text.trim();
-    final confirmPassword = _confirmController.text.trim();
-
-    if (!email.endsWith('@theinnovationstory.com')) {
-      await _showErrorDialog('Email must end with @theinnovationstory.com');
-      return;
-    }
-
-    if (password != confirmPassword) {
-      await _showErrorDialog('Passwords do not match');
-      return;
-    }
-
-    setState(() => _isLoading = true);
-
-    try {
-      // Store user request in Firestore with 'pending' status
-      await FirebaseFirestore.instance
-          .collection('pending_users')
-          .doc(email)
-          .set({
-            'email': email,
-            'password': password,
-            'role': _role,
-            'status': 'pending',
-            'createdAt': FieldValue.serverTimestamp(),
-          });
-
-      await _showSuccessDialog();
-    } catch (e) {
-      print("Signup Error: $e");
-      await _showErrorDialog('Something went wrong. Please try again.');
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
+Future<void> _signUp() async {
+  final email = _emailController.text.trim();
+  final password = _passwordController.text.trim();
+  final confirmPassword = _confirmController.text.trim();
+  final name=  _nameController.text.trim();
+    // ✅ Email check
+  if (!email.endsWith('@theinnovationstory.com')) {
+    await _showErrorDialog('Email must end with @theinnovationstory.com');
+    return;
   }
 
+  // ✅ Password match check
+  if (password != confirmPassword) {
+    await _showErrorDialog('Passwords do not match');
+    return;
+  }
+
+  // ✅ Dropdown selection check
+  if (_selectedTeam == null || _selectedBranch == null) {
+    await _showErrorDialog('Please select both team and branch');
+    return;
+  }
+
+  setState(() => _isLoading = true);
+
+  try {
+    // Store user request in Firestore with 'pending' status
+    await FirebaseFirestore.instance
+        .collection('pending_users')
+        .doc(email)
+        .set({
+          'email': email,
+          'password': password, // ❗ Consider hashing or removing before production
+          'role': _role,
+          'team': _selectedTeam,
+          'branch': _selectedBranch,
+          'status': 'pending',
+          'name': name,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+
+    await _showSuccessDialog();
+  } catch (e) {
+    print("Signup Error: $e");
+    await _showErrorDialog('Something went wrong. Please try again.');
+  } finally {
+    if (mounted) setState(() => _isLoading = false);
+  }
+}
   @override
   Widget build(BuildContext context) {
     const Color backgroundColor = Color(0xFFF4F6FD);
@@ -171,6 +187,34 @@ class _SignUpPageState extends State<SignUpPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
+                         TextField(
+                          controller: _nameController,
+                          keyboardType: TextInputType.text,
+                          decoration: InputDecoration(
+                            labelText: 'Name',
+                            labelStyle: const TextStyle(color: iconColor),
+                            prefixIcon: const Icon(
+                              Icons.email_outlined,
+                              color: iconColor,
+                            ),
+                            filled: true,
+                            fillColor: const Color(0xFFF0F0F0),
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: BorderSide(
+                                color: Colors.grey.shade300,
+                              ),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              borderSide: const BorderSide(
+                                color: accentColor,
+                                width: 2,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
                         TextField(
                           controller: _emailController,
                           keyboardType: TextInputType.emailAddress,
@@ -284,6 +328,70 @@ class _SignUpPageState extends State<SignUpPage> {
                     ),
                   ),
                 ),
+
+                // Inside your Column in the Card (after confirm password field)
+const SizedBox(height: 16),
+DropdownButtonFormField<String>(
+  value: _selectedTeam,
+  decoration: InputDecoration(
+    labelText: 'Select Team',
+    labelStyle: const TextStyle(color: iconColor),
+    prefixIcon: const Icon(Icons.group_outlined, color: iconColor),
+    filled: true,
+    fillColor: const Color(0xFFF0F0F0),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8),
+      borderSide: BorderSide(color: Colors.grey.shade300),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8),
+      borderSide: const BorderSide(color: accentColor, width: 2),
+    ),
+  ),
+  items: _teams.map((team) {
+    return DropdownMenuItem<String>(
+      value: team,
+      child: Text(team),
+    );
+  }).toList(),
+  onChanged: (value) {
+    setState(() {
+      _selectedTeam = value!;
+    });
+  },
+),
+
+const SizedBox(height: 16),
+DropdownButtonFormField<String>(
+  value: _selectedBranch,
+  decoration: InputDecoration(
+    labelText: 'Select Branch',
+    labelStyle: const TextStyle(color: iconColor),
+    prefixIcon: const Icon(Icons.location_city_outlined, color: iconColor),
+    filled: true,
+    fillColor: const Color(0xFFF0F0F0),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8),
+      borderSide: BorderSide(color: Colors.grey.shade300),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(8),
+      borderSide: const BorderSide(color: accentColor, width: 2),
+    ),
+  ),
+  items: _branches.map((branch) {
+    return DropdownMenuItem<String>(
+      value: branch,
+      child: Text(branch),
+    );
+  }).toList(),
+  onChanged: (value) {
+    setState(() {
+      _selectedBranch = value!;
+    });
+  },
+),
+
                 const SizedBox(height: 24),
                 _isLoading
                     ? const Center(child: CircularProgressIndicator())

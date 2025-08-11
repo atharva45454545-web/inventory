@@ -55,11 +55,11 @@ class _NonReturnablePageState extends State<NonReturnablePage> {
         builder:
             (_) => ConfirmationPage(
               isReturnable: false,
-              userName: _studentController.text.trim(),
+             // userName: _studentController.text.trim(),
               reason: _reasonController.text.trim(),
               items: Map.fromEntries(
                 _selected.entries.where((e) => e.value > 0),
-              ),
+              ), remark: '',
             ),
       ),
     );

@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import '../services/item_service.dart';
 
@@ -13,7 +14,7 @@ class _AddItemPageState extends State<AddItemPage> {
   final _locationController = TextEditingController();
   final _priceController = TextEditingController();
   final _quantityController = TextEditingController();
-
+ String? _selectedBranch; // At the top of the State class
   String? _selectedTeam;
   bool _isLoading = false;
   String? _error;
@@ -25,31 +26,65 @@ class _AddItemPageState extends State<AddItemPage> {
     _priceController.dispose();
     _quantityController.dispose();
     super.dispose();
-  }
+  }Future<void> _saveItem() async {
+  setState(() {
+    _isLoading = true;
+    _error = null;
+  });
 
-  Future<void> _saveItem() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+  try {
+    final name = _nameController.text.trim();
+    final teamname = _selectedTeam ?? '';
+    final branch = _selectedBranch ?? ''; // NEW
+    final location = _locationController.text.trim();
+    final price = double.parse(_priceController.text.trim());
+    final quantity = int.parse(_quantityController.text.trim());
 
-    try {
-      await ItemService().addItem(
-        name: _nameController.text.trim(),
-        teamname: _selectedTeam ?? '',
-        location: _locationController.text.trim(),
-        price: double.parse(_priceController.text.trim()),
-        quantity: int.parse(_quantityController.text.trim()),
-      );
-      Navigator.pop(context);
-    } catch (e) {
-      setState(() {
-        _error = e.toString();
-      });
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+    if (name.isEmpty || teamname.isEmpty || branch.isEmpty) {
+      throw Exception("Please fill all required fields.");
     }
+
+    final existingItemQuery = await FirebaseFirestore.instance
+        .collection('items')
+        .where('name', isEqualTo: name)
+        .where('teamname', isEqualTo: teamname)
+        .where('branch', isEqualTo: branch) // NEW
+        .limit(1)
+        .get();
+
+    if (existingItemQuery.docs.isNotEmpty) {
+      // If item already exists — update quantity
+      final existingDoc = existingItemQuery.docs.first;
+      final currentQuantity = existingDoc['quantity'] ?? 0;
+
+      await existingDoc.reference.update({
+        'quantity': currentQuantity + quantity,
+        'price': price,
+        'location': location,
+        'branch': branch, // Keep branch updated
+      });
+    } else {
+      // If item is new — create document
+      await FirebaseFirestore.instance.collection('items').add({
+        'name': name,
+        'teamname': teamname,
+        'branch': branch, // NEW
+        'location': location,
+        'price': price,
+        'quantity': quantity,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    }
+
+    Navigator.pop(context);
+  } catch (e) {
+    setState(() {
+      _error = e.toString();
+    });
+  } finally {
+    if (mounted) setState(() => _isLoading = false);
   }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -138,6 +173,24 @@ class _AddItemPageState extends State<AddItemPage> {
               controller: _locationController,
               decoration: _inputDecoration('Location / Box Name'),
             ),
+            
+
+// Inside build():
+DropdownButtonFormField<String>(
+  value: _selectedBranch,
+  decoration: _inputDecoration('Branch'),
+  items: const [
+    DropdownMenuItem(value: 'Dadar', child: Text('Dadar')),
+    DropdownMenuItem(value: 'Bandra', child: Text('Bandra')),
+  ],
+  onChanged: (value) {
+    setState(() {
+      _selectedBranch = value;
+    });
+  },
+),
+const SizedBox(height: 16),
+
             const SizedBox(height: 16),
             TextField(
               controller: _priceController,
