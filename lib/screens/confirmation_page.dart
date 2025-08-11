@@ -4,14 +4,15 @@ import '../services/transaction_service.dart';
 
 class ConfirmationPage extends StatefulWidget {
   final bool isReturnable;
-  final String userName;
+  final String remark;
   final String? reason;
   final Map<String, int> items;
-
+  
   const ConfirmationPage({
     Key? key,
     required this.isReturnable,
-    required this.userName,
+    required this.remark,
+ 
     this.reason,
     required this.items,
   }) : super(key: key);
@@ -32,7 +33,7 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
     try {
       await TransactionService().createTransaction(
         isReturnable: widget.isReturnable,
-        userName: widget.userName,
+        userName: widget.remark,
         reason: widget.reason,
         items: widget.items,
       );
@@ -53,7 +54,7 @@ class _ConfirmationPageState extends State<ConfirmationPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Name: ${widget.userName}'),
+            Text('Name: ${widget.remark}'),
             if (!widget.isReturnable && widget.reason != null)
               Text('Reason: ${widget.reason}'),
             const SizedBox(height: 16),

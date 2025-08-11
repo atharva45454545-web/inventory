@@ -1,7 +1,7 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '/screens/confirmation_page.dart';
-// import '../services/transaction_service.dart';
 
 class ReturnablePage extends StatefulWidget {
   const ReturnablePage({Key? key}) : super(key: key);
@@ -11,7 +11,8 @@ class ReturnablePage extends StatefulWidget {
 }
 
 class _ReturnablePageState extends State<ReturnablePage> {
-  final _nameController = TextEditingController();
+  final _remarkController = TextEditingController();
+  final _reasonController = TextEditingController();
   String _search = '';
   Map<String, int> _selected = {};
   String? _selectedTeam;
@@ -19,26 +20,29 @@ class _ReturnablePageState extends State<ReturnablePage> {
 
   @override
   void dispose() {
-    _nameController.dispose();
+    _remarkController.dispose();
+    _reasonController.dispose();
     super.dispose();
   }
 
   bool get _canPlace =>
-      _nameController.text.trim().isNotEmpty &&
+      _remarkController.text.trim().isNotEmpty &&
+      _reasonController.text.trim().isNotEmpty &&
       _selected.values.any((q) => q > 0);
 
   void _placeOrder() {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder:
-            (_) => ConfirmationPage(
-              isReturnable: true,
-              userName: _nameController.text.trim(),
-              items: Map.fromEntries(
-                _selected.entries.where((e) => e.value > 0),
-              ),
-            ),
+        builder: (_) => ConfirmationPage(
+       //   userName: FirebaseAuth.instance.currentUser?.email ?? 'Unknown User',
+          isReturnable: true,
+          remark: _remarkController.text.trim(),
+          reason: _reasonController.text.trim(),
+          items: Map.fromEntries(
+            _selected.entries.where((e) => e.value > 0),
+          ),
+        ),
       ),
     );
   }
@@ -46,7 +50,8 @@ class _ReturnablePageState extends State<ReturnablePage> {
   @override
   void initState() {
     super.initState();
-    _nameController.addListener(() => setState(() {}));
+    _remarkController.addListener(() => setState(() {}));
+    _reasonController.addListener(() => setState(() {}));
 
     FirebaseFirestore.instance.collection('items').get().then((snapshot) {
       final teamSet = <String>{};
@@ -83,7 +88,7 @@ class _ReturnablePageState extends State<ReturnablePage> {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Column(
             children: [
-              // Name Input Field
+              // Remark Field
               Card(
                 color: Colors.white,
                 elevation: 2,
@@ -91,16 +96,45 @@ class _ReturnablePageState extends State<ReturnablePage> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: TextField(
-                    controller: _nameController,
+                    controller: _remarkController,
                     decoration: InputDecoration(
-                      labelText: 'Enter your name',
+                      labelText: 'Enter Remark',
                       labelStyle: TextStyle(color: iconColor),
-                      prefixIcon: Icon(Icons.person_outline, color: iconColor),
+                      prefixIcon: Icon(Icons.comment_outlined, color: iconColor),
+                      filled: true,
+                      fillColor: const Color(0xFFF0F0F0),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: accentColor, width: 2),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 12),
+
+              // Reason for Issue Field
+              Card(
+                color: Colors.white,
+                elevation: 2,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: TextField(
+                    controller: _reasonController,
+                    decoration: InputDecoration(
+                      labelText: 'Reason for Issue',
+                      labelStyle: TextStyle(color: iconColor),
+                      prefixIcon: Icon(Icons.help_outline, color: iconColor),
                       filled: true,
                       fillColor: const Color(0xFFF0F0F0),
                       enabledBorder: OutlineInputBorder(
@@ -126,10 +160,7 @@ class _ReturnablePageState extends State<ReturnablePage> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: TextField(
                     decoration: InputDecoration(
                       labelText: 'Search items',
@@ -152,7 +183,8 @@ class _ReturnablePageState extends State<ReturnablePage> {
               ),
 
               const SizedBox(height: 16),
-              // Teamname Filter Dropdown
+
+              // Team Filter Dropdown
               if (_teams.isNotEmpty)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 12),
@@ -182,29 +214,20 @@ class _ReturnablePageState extends State<ReturnablePage> {
               // Items List
               Expanded(
                 child: StreamBuilder<QuerySnapshot>(
-                  stream:
-                      FirebaseFirestore.instance
-                          .collection('items')
-                          .snapshots(),
+                  stream: FirebaseFirestore.instance.collection('items').snapshots(),
                   builder: (context, snap) {
                     if (!snap.hasData) {
                       return const Center(child: CircularProgressIndicator());
                     }
                     final docs = snap.data!.docs;
 
-                    // Filter safely using toString()
-                    final filtered =
-                        docs.where((d) {
-                          final name =
-                              d['name']?.toString().toLowerCase() ?? '';
-                          final team = d['teamname']?.toString();
-                          final matchesSearch = name.contains(
-                            _search.toLowerCase(),
-                          );
-                          final matchesTeam =
-                              _selectedTeam == null || team == _selectedTeam;
-                          return matchesSearch && matchesTeam;
-                        }).toList();
+                    final filtered = docs.where((d) {
+                      final name = d['name']?.toString().toLowerCase() ?? '';
+                      final team = d['teamname']?.toString();
+                      final matchesSearch = name.contains(_search.toLowerCase());
+                      final matchesTeam = _selectedTeam == null || team == _selectedTeam;
+                      return matchesSearch && matchesTeam;
+                    }).toList();
 
                     if (filtered.isEmpty) {
                       return Center(
@@ -221,8 +244,7 @@ class _ReturnablePageState extends State<ReturnablePage> {
                         final d = filtered[index];
                         final id = d.id;
                         final name = d['name']?.toString() ?? 'Unnamed';
-                        final available =
-                            int.tryParse(d['quantity']?.toString() ?? '0') ?? 0;
+                        final available = int.tryParse(d['quantity']?.toString() ?? '0') ?? 0;
                         final selected = _selected[id] ?? 0;
                         final team = d['teamname']?.toString() ?? 'Unknown';
 
@@ -232,21 +254,14 @@ class _ReturnablePageState extends State<ReturnablePage> {
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          margin: const EdgeInsets.symmetric(
-                            vertical: 6,
-                            horizontal: 0,
-                          ),
+                          margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 0),
                           child: Padding(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
-                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                             child: Row(
                               children: [
                                 Expanded(
                                   child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
+                                    crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         name,
@@ -257,10 +272,8 @@ class _ReturnablePageState extends State<ReturnablePage> {
                                         ),
                                       ),
                                       const SizedBox(height: 4),
-
                                       Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
+                                        crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
                                           Text(
                                             'Available: $available',
@@ -282,26 +295,18 @@ class _ReturnablePageState extends State<ReturnablePage> {
                                     ],
                                   ),
                                 ),
-
-                                // Quantity Selector
                                 Row(
                                   children: [
                                     IconButton(
                                       icon: Icon(
                                         Icons.remove_circle_outline,
-                                        color:
-                                            selected > 0
-                                                ? accentColor
-                                                : Colors.grey.shade400,
+                                        color: selected > 0
+                                            ? accentColor
+                                            : Colors.grey.shade400,
                                       ),
-                                      onPressed:
-                                          selected > 0
-                                              ? () => setState(
-                                                () =>
-                                                    _selected[id] =
-                                                        selected - 1,
-                                              )
-                                              : null,
+                                      onPressed: selected > 0
+                                          ? () => setState(() => _selected[id] = selected - 1)
+                                          : null,
                                     ),
                                     Text(
                                       '$selected',
@@ -314,19 +319,13 @@ class _ReturnablePageState extends State<ReturnablePage> {
                                     IconButton(
                                       icon: Icon(
                                         Icons.add_circle_outline,
-                                        color:
-                                            selected < available
-                                                ? accentColor
-                                                : Colors.grey.shade400,
+                                        color: selected < available
+                                            ? accentColor
+                                            : Colors.grey.shade400,
                                       ),
-                                      onPressed:
-                                          selected < available
-                                              ? () => setState(
-                                                () =>
-                                                    _selected[id] =
-                                                        selected + 1,
-                                              )
-                                              : null,
+                                      onPressed: selected < available
+                                          ? () => setState(() => _selected[id] = selected + 1)
+                                          : null,
                                     ),
                                   ],
                                 ),
@@ -347,8 +346,7 @@ class _ReturnablePageState extends State<ReturnablePage> {
                 padding: const EdgeInsets.symmetric(horizontal: 0),
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor:
-                        _canPlace ? accentColor : Colors.grey.shade400,
+                    backgroundColor: _canPlace ? accentColor : Colors.grey.shade400,
                     foregroundColor: Colors.white,
                     minimumSize: const Size.fromHeight(50),
                     shape: RoundedRectangleBorder(
